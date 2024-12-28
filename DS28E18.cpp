@@ -10,7 +10,7 @@
 // https://community.particle.io/t/syscall-yield-operation/40708/2
 #if defined(PLATFORM_ID)  // Only defined if a Particle device
 inline void yield() {
-	Particle.process();
+  Particle.process();
 }
 #elif ARDUINO >= 100
 #include "Arduino.h"
@@ -32,8 +32,8 @@ DS28E18Device::DS28E18Device(OneWire* wire, DeviceAddress deviceAddress) {
   _spd = 0x01;
 }
 
-void DS28E18Device::firstInit() {
-  uint8_t cmd[] = {DS28E18WriteGPIOConfiguration,0x0b,0x03,0xa5,0x0f};
+void DS28E18Device::firstInit(uint8_t ctlRegHi, uint8_t ctlRegLo) {
+  uint8_t cmd[] = {DS28E18WriteGPIOConfiguration,0x0b,0x03, ctlRegHi, ctlRegLo};
   _wire->reset();
   _wire->skip();
   uint8_t result[2];
@@ -73,6 +73,13 @@ uint16_t DS28E18Device::getStatus() {
   }
   _lastError = SUCCESS;
   return result[1];
+}
+
+bool DS28E18Device::setSpiSs(uint8_t value) {
+  uint8_t cmd[] = {value ? DS28E18SsHigh : DS28E18SsLow};
+  uint8_t result[1];
+  uint8_t result_len = 1;
+  return write_cmd(cmd, 1, result, &result_len);
 }
 
 bool DS28E18Device::load_sequencer(uint8_t* sequence, uint16_t sequenceStart, uint16_t sequenceLen) {
@@ -216,11 +223,11 @@ bool DS28E18Device::write_cmd_(uint8_t* cmd, uint8_t cmdLen, uint8_t* result, ui
   if((crc ^ neg_crc) != 0xFFFF) { 
     Serial.printf("CRC: %04x != %04x\r\n", crc, neg_crc);
     return false;
-  //} else {
-  //  Serial.println("crc match");
+    //} else {
+    //  Serial.println("crc match");
   }
   _wire->write(0xAA);
-  delayMicroseconds(max(1000U, waitTime));
+  delayMicroseconds(max(10U, waitTime));
   _wire->read(); // dummy read
   uint8_t rec_len = _wire->read(); // length
   if(rec_len == 0xFF) {
@@ -236,8 +243,8 @@ bool DS28E18Device::write_cmd_(uint8_t* cmd, uint8_t cmdLen, uint8_t* result, ui
   if((crc ^ neg_crc) != 0xFFFF) { 
     Serial.printf("CRC2: %04x != %04x\r\n", crc, neg_crc);
     return false;
-  //} else {
-  //  Serial.println("crc2 match");
+    //} else {
+    //  Serial.println("crc2 match");
   }
   int max_result_size = 0;
   if(resultLen != NULL) {
@@ -255,40 +262,40 @@ bool DS28E18Device::write_cmd_(uint8_t* cmd, uint8_t cmdLen, uint8_t* result, ui
 int16_t DS28E18Device::getExecutionTime(uint8_t* sequence, uint16_t sequenceLen) {
   // time table as on page 44 of datasheet
   uint8_t time_by_spd[] = {33,12,8,0, // 02, 03
-                          136,45,25,0, //E3, D3,D4
-                          123,42,25,17, // C0
-                          35,15,10,8}; // 01, 80
+    136,45,25,0, //E3, D3,D4
+    123,42,25,17, // C0
+    35,15,10,8}; // 01, 80
   uint16_t i = 0;
   uint16_t time_us = 0;
   while(i < sequenceLen) {
     switch(sequence[i]) {
       // i2c commands
-      case 0x02:
-      case 0x03:
-        if(_spd > 2) {
-          Serial.println("Sequence calc wrong spd");
-          return -3;
-        }
-        time_us += time_by_spd[0 * 4 + _spd];
-        break;
-      case 0xE3:
-      case 0xD3:
-      case 0xD4:
-        if(_spd > 2) {
-          Serial.println("Sequence calc wrong spd");
-          return -3;
-        }
-        i++;
-        if((i + sequence[i]) >= sequenceLen) {
-          Serial.println("Sequence to short");
-          return -1;
-        }
-        time_us += sequence[i] * time_by_spd[1 * 4 + _spd];
-        i += sequence[i];
-        break;
+    case 0x02:
+    case 0x03:
+      if(_spd > 2) {
+	Serial.println("Sequence calc wrong spd");
+	return -3;
+      }
+      time_us += time_by_spd[0 * 4 + _spd];
+      break;
+    case 0xE3:
+    case 0xD3:
+    case 0xD4:
+      if(_spd > 2) {
+	Serial.println("Sequence calc wrong spd");
+	return -3;
+      }
+      i++;
+      if((i + sequence[i]) >= sequenceLen) {
+	Serial.println("Sequence to short");
+	return -1;
+      }
+      time_us += sequence[i] * time_by_spd[1 * 4 + _spd];
+      i += sequence[i];
+      break;
       // spi commands
-      case 0xC0:
-        {
+    case 0xC0:
+      {
         if(_spd > 3) {
           Serial.println("Sequence calc wrong spd");
           return -3;
@@ -307,10 +314,10 @@ int16_t DS28E18Device::getExecutionTime(uint8_t* sequence, uint16_t sequenceLen)
         }
         time_us += (rl + wl) * time_by_spd[2 * 4 + _spd];
         i += (rl + wl);
-        }
-        break;
-      case 0xB0:
-        {
+      }
+      break;
+    case 0xB0:
+      {
         if((i + 2) >= sequenceLen) {
           Serial.println("Sequence to short");
           return -1;
@@ -330,42 +337,42 @@ int16_t DS28E18Device::getExecutionTime(uint8_t* sequence, uint16_t sequenceLen)
         if(rl > 0){
           i += (rl - 1) / 8 + 1;
         }
-        }
-        break;
-      case 0x01:
-      case 0x80:
-        if(_spd > 2) {
-          Serial.println("Sequence calc wrong spd");
-          return -3;
-        }
-        time_us += sequence[i] * time_by_spd[1 * 4 + _spd];
-        break;
-      case 0xDD:
-        i++;
-        if((i + sequence[i]) >= sequenceLen) {
-          Serial.println("Sequence to short");
-          return -1;
-        }
-        time_us += pow(2, sequence[i]) * 1248;
-        break;
-      case 0xCC:
-      case 0xBB:
-        time_us += 6;
-        break;
-      case 0xD1:
-      case 0x1D:
-        time_us += 8;
-        i++;
-        break;
-      case 0xE2:
-      case 0x2E:
-        time_us += 10;
-        i += 2;
-        break;
-      default:
-        Serial.println("Sequence cmd unknown");
-        return -2;
-        break;
+      }
+      break;
+    case 0x01:
+    case 0x80:
+      if(_spd > 2) {
+	Serial.println("Sequence calc wrong spd");
+	return -3;
+      }
+      time_us += sequence[i] * time_by_spd[1 * 4 + _spd];
+      break;
+    case 0xDD:
+      i++;
+      if((i + sequence[i]) >= sequenceLen) {
+	Serial.println("Sequence to short");
+	return -1;
+      }
+      time_us += pow(2, sequence[i]) * 1248;
+      break;
+    case 0xCC:
+    case 0xBB:
+      time_us += 6;
+      break;
+    case 0xD1:
+    case 0x1D:
+      time_us += 8;
+      i++;
+      break;
+    case 0xE2:
+    case 0x2E:
+      time_us += 10;
+      i += 2;
+      break;
+    default:
+      Serial.println("Sequence cmd unknown");
+      return -2;
+      break;
     }
     i++;
   }
@@ -375,12 +382,12 @@ int16_t DS28E18Device::getExecutionTime(uint8_t* sequence, uint16_t sequenceLen)
 
 
 DS28E18::DS28E18() {
-	_useExternalPullup = false;
+  _useExternalPullup = false;
   _initTries = 0;
 }
 
 DS28E18::DS28E18(OneWire* oneWire) : DS28E18() {
-	setOneWire(oneWire);
+  setOneWire(oneWire);
 }
 
 /*
@@ -388,43 +395,49 @@ DS28E18::DS28E18(OneWire* oneWire) : DS28E18() {
  * power (2 wires) setup. 
  */
 DS28E18::DS28E18(OneWire* oneWire, uint8_t pullupPin, bool negatePullup) : DS28E18(oneWire) {
-	setPullupPin(pullupPin, negatePullup);
+  setPullupPin(pullupPin, negatePullup);
 }
 
 void DS28E18::setPullupPin(uint8_t pullupPin, bool negatePullup) {
-	_useExternalPullup = true;
-	_pullupPin = pullupPin;
+  _useExternalPullup = true;
+  _pullupPin = pullupPin;
   _negatePullup = negatePullup;
-	pinMode(pullupPin, OUTPUT);
-	deactivateExternalPullup();
+  pinMode(pullupPin, OUTPUT);
+  deactivateExternalPullup();
 }
 
 void DS28E18::setOneWire(OneWire* oneWire) {
-	_wire = oneWire;
-	_devices.clear();
+  _wire = oneWire;
+  _devices.clear();
 }
 
 // initialise the bus
 bool DS28E18::begin(void) {
-	DeviceAddress deviceAddress;
+  begin(0xa5, 0x0f);
+}
 
-	_wire->reset_search();
-	_devices.clear(); // Reset the number of devices when we enumerate wire devices
+}
+
+bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {  
+  DeviceAddress deviceAddress;
+
+  _wire->reset_search();
+  _devices.clear(); // Reset the number of devices when we enumerate wire devices
   bool init_need = false;
-	while (_wire->search(deviceAddress)) {
-		if (validAddress(deviceAddress)) {
-			if (deviceAddress[0] == DS28E18MODEL) {
+  while (_wire->search(deviceAddress)) {
+    if (validAddress(deviceAddress)) {
+      if (deviceAddress[0] == DS28E18MODEL) {
         _devices.push_back(new DS28E18Device(_wire, deviceAddress));
         if(deviceAddress[7] == DS28E18EMPTYCRC) {
           init_need = true;
         }
       }
-		}
-	}
+    }
+  }
   if(init_need) {
     if(_initTries++ < 3) {
       Serial.println("First init");
-      _devices.at(0)->firstInit();
+      _devices.at(0)->firstInit(ctlRegHi, ctlRegLo);
       return begin(); // we recurse max tree times to init
     } else {
       return false;
@@ -443,7 +456,7 @@ bool DS28E18::begin(void) {
 
 // returns the number of devices found on the bus
 uint8_t DS28E18::getDeviceCount(void) {
-	return _devices.size();
+  return _devices.size();
 }
 
 uint8_t DS28E18::getStatus(DeviceAddress deviceAddress) {
@@ -457,12 +470,27 @@ uint8_t DS28E18::getStatus(DeviceAddress deviceAddress) {
 
 uint8_t DS28E18::getStatus(uint8_t index) {
   IDXCHECK
-  return _devices.at(index)->getStatus();
+    return _devices.at(index)->getStatus();
+}
+
+// sets SPI SS pin high or low.
+bool setSpiSs(DeviceAddress addr, uint8_t value) {
+  for(auto it : _devices) {
+    if(it->hasAddress(deviceAddress)) {
+      return it->setSpiSs(value);
+    }
+  }
+  return 0xFF;
+}
+
+bool setSpiSs(uint8_t index, uint8_t value) {
+  IDXCHECK
+    return _devices.at(index)->setSpiSs(value);
 }
 
 bool DS28E18::getAddress(uint8_t* deviceAddress, uint8_t index) {
   IDXCHECK
-  bcopy(_devices.at(index)->getAddress(), deviceAddress, sizeof(DeviceAddress));
+    bcopy(_devices.at(index)->getAddress(), deviceAddress, sizeof(DeviceAddress));
   return true;
 }
 
@@ -495,7 +523,7 @@ bool DS28E18::load_sequencer(DeviceAddress deviceAddress, uint8_t* sequence, uin
 
 bool DS28E18::load_sequencer(uint8_t index, uint8_t* sequence, uint16_t sequenceStart, uint16_t sequenceLen) {
   IDXCHECK
-  return _devices.at(index)->load_sequencer(sequence, sequenceStart, sequenceLen);
+    return _devices.at(index)->load_sequencer(sequence, sequenceStart, sequenceLen);
 }
 
 bool DS28E18::run_sequencer(DeviceAddress deviceAddress, uint16_t sequenceStart, uint16_t sequenceLen, uint32_t waitTime) {
@@ -507,7 +535,7 @@ bool DS28E18::run_sequencer(DeviceAddress deviceAddress, uint16_t sequenceStart,
 
 bool DS28E18::run_sequencer(uint8_t index, uint16_t sequenceStart, uint16_t sequenceLen, uint32_t waitTime) {
   IDXCHECK
-  return _devices.at(index)->run_sequencer(sequenceStart, sequenceLen, waitTime);
+    return _devices.at(index)->run_sequencer(sequenceStart, sequenceLen, waitTime);
 }
 
 bool DS28E18::read_sequencer(DeviceAddress deviceAddress, uint16_t start, uint16_t len, uint8_t* result) {
@@ -519,26 +547,26 @@ bool DS28E18::read_sequencer(DeviceAddress deviceAddress, uint16_t start, uint16
 
 bool DS28E18::read_sequencer(uint8_t index, uint16_t start, uint16_t len, uint8_t* result) {
   IDXCHECK
-  return _devices.at(index)->read_sequencer(start, len, result);
+    return _devices.at(index)->read_sequencer(start, len, result);
 
 }
 
 bool DS28E18::MPR_sensor_init(DeviceAddress deviceAddress) {
   uint8_t sequence[] = {  0x02, // start
-                          0xE3, 0x04, 0x30, 0xaa, 0x00, 0x00, // write addr(18w) AA 00 00
-                          0x03, // stop
-                          0xDD, 0x03, // delay(8)
-                          0x02, // start
-                          0xE3, 0x01, 0x31, // write addr(18r)
-                          0xD3, 0x04, 0xFF, 0xFF, 0xFF, 0xFF,  // read 4 byte (addr is 16)
-                          0x03 }; // stop
+    0xE3, 0x04, 0x30, 0xaa, 0x00, 0x00, // write addr(18w) AA 00 00
+    0x03, // stop
+    0xDD, 0x03, // delay(8)
+    0x02, // start
+    0xE3, 0x01, 0x31, // write addr(18r)
+    0xD3, 0x04, 0xFF, 0xFF, 0xFF, 0xFF,  // read 4 byte (addr is 16)
+    0x03 }; // stop
   Serial.printf("execution time: %d\r\n", getDevByAddress(deviceAddress)->getExecutionTime(sequence, sizeof(sequence)));
   return load_sequencer(deviceAddress, sequence, 0, sizeof(sequence));
 }
 
 bool DS28E18::MPR_sensor_init(uint8_t index) {
   IDXCHECK
-  return MPR_sensor_init(*(_devices.at(index)->getAddress()));
+    return MPR_sensor_init(*(_devices.at(index)->getAddress()));
 }
 
 bool DS28E18::MPR_sensor_measure(DeviceAddress deviceAddress) {
@@ -549,7 +577,7 @@ bool DS28E18::MPR_sensor_measure(DeviceAddress deviceAddress) {
 
 bool DS28E18::MPR_sensor_measure(uint8_t index) {
   IDXCHECK
-  return MPR_sensor_measure(*(_devices.at(index)->getAddress()));
+    return MPR_sensor_measure(*(_devices.at(index)->getAddress()));
 }
 
 bool DS28E18::MPR_sensor_read_result(DeviceAddress deviceAddress) {
@@ -560,7 +588,7 @@ bool DS28E18::MPR_sensor_read_result(DeviceAddress deviceAddress) {
 
 bool DS28E18::MPR_sensor_read_result(uint8_t index) {
   IDXCHECK
-  return MPR_sensor_read_result(*(_devices.at(index)->getAddress()));
+    return MPR_sensor_read_result(*(_devices.at(index)->getAddress()));
 }
 
 bool DS28E18::MPR_sensor_get_result(DeviceAddress deviceAddress, uint8_t &status, uint32_t &value) {
@@ -576,7 +604,7 @@ bool DS28E18::MPR_sensor_get_result(DeviceAddress deviceAddress, uint8_t &status
 
 bool DS28E18::MPR_sensor_get_result(uint8_t index, uint8_t &status, uint32_t &value) {
   IDXCHECK
-  return MPR_sensor_get_result(*(_devices.at(index)->getAddress()), status, value);
+    return MPR_sensor_get_result(*(_devices.at(index)->getAddress()), status, value);
 }
 
 bool DS28E18::MPR_sensor_measure_result(DeviceAddress deviceAddress, uint8_t &status, uint32_t &value) {
@@ -588,21 +616,21 @@ bool DS28E18::MPR_sensor_measure_result(DeviceAddress deviceAddress, uint8_t &st
 
 bool DS28E18::MPR_sensor_measure_result(uint8_t index, uint8_t &status, uint32_t &value) {
   IDXCHECK
-  return MPR_sensor_measure_result(*(_devices.at(index)->getAddress()), status, value);
+    return MPR_sensor_measure_result(*(_devices.at(index)->getAddress()), status, value);
 }
 
 void DS28E18::activateExternalPullup() {
-	if (_useExternalPullup)
-		digitalWrite(_pullupPin, _negatePullup ? HIGH : LOW);
+  if (_useExternalPullup)
+    digitalWrite(_pullupPin, _negatePullup ? HIGH : LOW);
 }
 
 void DS28E18::deactivateExternalPullup() {
-	if (_useExternalPullup)
-		digitalWrite(_pullupPin, _negatePullup ? LOW : HIGH);
+  if (_useExternalPullup)
+    digitalWrite(_pullupPin, _negatePullup ? LOW : HIGH);
 }
 
 // returns true if address is valid
 bool DS28E18::validAddress(const uint8_t* deviceAddress) {
-	return (_wire->crc8((uint8_t*)deviceAddress, 7) == deviceAddress[7]);
+  return (_wire->crc8((uint8_t*)deviceAddress, 7) == deviceAddress[7]);
 }
 

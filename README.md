@@ -24,6 +24,9 @@ There is support for honeywell preasure sensor MPR series built in. Functions ar
 
 currently only tested on ESP32 with PSU connected (no strong pullup)
 
+Modified for use with SPI bus. In particular, begin() now takes args so the SPI pins can be setup properly.
+Also exposes a couple more functions that are useful with SPI.
+
 # License
 
 This library is free software; you can redistribute it and/or

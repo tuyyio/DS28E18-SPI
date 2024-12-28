@@ -35,6 +35,8 @@
 #define DS28E18WriteGPIOConfiguration 0x83
 #define DS28E18ReadGPIOConfiguration  0x7C
 #define DS28E18DeviceStatus           0x7A
+#define DS28E18SsLow                  0x80
+#define DS28E18SsHigh                 0x01
 
 typedef uint8_t DeviceAddress[8];
 
@@ -53,6 +55,7 @@ public:
   DeviceAddress* getAddress(void);
   bool hasAddress(DeviceAddress deviceAddress);
   uint16_t getStatus(void);
+  bool setSpiSs(uint8_t);
   bool load_sequencer(uint8_t* sequence, uint16_t sequenceStart, uint16_t sequenceLen);
   bool run_sequencer(uint16_t sequenceStart, uint16_t sequenceLen, uint32_t waitTime);
   bool read_sequencer(uint16_t start, uint16_t len, uint8_t* result);
@@ -62,8 +65,8 @@ public:
   int16_t getExecutionTime(uint8_t* sequence, uint16_t sequenceLen);
 
 private:
-  bool write_cmd(uint8_t* cmd, uint8_t cmdLen, uint8_t* result = NULL, uint8_t* resultLen = NULL, uint32_t waitTime = 1000);
-  bool write_cmd_(uint8_t* cmd, uint8_t cmdLen, uint8_t* result = NULL, uint8_t* resultLen = NULL, uint32_t waitTime = 1000);
+  bool write_cmd(uint8_t* cmd, uint8_t cmdLen, uint8_t* result = NULL, uint8_t* resultLen = NULL, uint32_t waitTime = 10);
+  bool write_cmd_(uint8_t* cmd, uint8_t cmdLen, uint8_t* result = NULL, uint8_t* resultLen = NULL, uint32_t waitTime = 10);
   
   OneWire* _wire;
   DeviceAddress _deviceAddress;
@@ -76,15 +79,16 @@ private:
 
 class DS28E18 {
 public:
-	DS28E18();
-	DS28E18(OneWire*);
-	DS28E18(OneWire*, uint8_t pullupPin, bool negatePullup = false);
+  DS28E18();
+  DS28E18(OneWire*);
+  DS28E18(OneWire*, uint8_t pullupPin, bool negatePullup = false);
 
-	void setPullupPin(uint8_t pullupPin, bool negatePullup = false);
-	void setOneWire(OneWire*);
+  void setPullupPin(uint8_t pullupPin, bool negatePullup = false);
+  void setOneWire(OneWire*);
 
-	// initialise bus
-	bool begin(void);
+  // initialise bus
+  bool begin();
+  bool begin(uint8_t, uint8_t);
 
   // returns the count of DS28E28 found on the bus
   uint8_t getDeviceCount(void);
@@ -107,6 +111,10 @@ public:
   // read SRAM contens
   bool read_sequencer(DeviceAddress deviceAddress, uint16_t start, uint16_t len, uint8_t* result);
   bool read_sequencer(uint8_t index, uint16_t start, uint16_t len, uint8_t* result);
+
+  // sets SPI SS pin high or low.
+  bool setSpiSs(DeviceAddress addr, uint8_t value);
+  bool setSpiSs(uint8_t index, uint8_t value);
   
   // load sequence for Honeywell MPR I2C chip
   bool MPR_sensor_init(DeviceAddress deviceAddress);
@@ -130,27 +138,27 @@ public:
   bool MPR_sensor_measure_result(uint8_t index, uint8_t &status, uint32_t &value);
 
   // returns true if address is valid
-	bool validAddress(const uint8_t*);
+  bool validAddress(const uint8_t*);
 
 private:
-	// External pullup control
+  // External pullup control
   int getIdByAddress(DeviceAddress deviceAddress);
   DS28E18Device* getDevByAddress(DeviceAddress deviceAddress);
-	void activateExternalPullup(void);
-	void deactivateExternalPullup(void);
+  void activateExternalPullup(void);
+  void deactivateExternalPullup(void);
 
   //bool write_cmd(uint8_t* cmd, uint8_t cmdLen, uint8_t* result = NULL, uint8_t* resultLen = NULL, uint8_t waitTime = 1);
 
-	// parasite power on or off
-	bool _parasite;
+  // parasite power on or off
+  bool _parasite;
 
-	// external pullup
-	bool _useExternalPullup;
-	uint8_t _pullupPin;
+  // external pullup
+  bool _useExternalPullup;
+  uint8_t _pullupPin;
   bool _negatePullup;
 
-	// Take a pointer to one wire instance
-	OneWire* _wire;
+  // Take a pointer to one wire instance
+  OneWire* _wire;
   uint8_t _initTries;
   std::vector<DS28E18Device*> _devices;
 };
