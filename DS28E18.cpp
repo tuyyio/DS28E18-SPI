@@ -492,7 +492,7 @@ uint8_t DS28E18::getStatus(uint8_t index) {
 // sets SPI SS pin high or low.
 bool DS28E18::setSpiSs(DeviceAddress addr, uint8_t value) {
   for(auto it : _devices) {
-    if(it->hasAddress(deviceAddress)) {
+    if(it->hasAddress(addr)) {
       return it->setSpiSs(value);
     }
   }
