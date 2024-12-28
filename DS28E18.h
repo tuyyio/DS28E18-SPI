@@ -52,6 +52,7 @@ public:
   };
   DS28E18Device(OneWire* wire, DeviceAddress deviceAddress);
   void firstInit(void);
+  void firstInit(uint8_t, uint8_t);
   DeviceAddress* getAddress(void);
   bool hasAddress(DeviceAddress deviceAddress);
   uint16_t getStatus(void);

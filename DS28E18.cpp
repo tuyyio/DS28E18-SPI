@@ -76,7 +76,7 @@ uint16_t DS28E18Device::getStatus() {
 }
 
 bool DS28E18Device::setSpiSs(uint8_t value) {
-  uint8_t cmd[] = {value ? DS28E18SsHigh : DS28E18SsLow};
+  uint8_t cmd[] = {(uint8_t) value ? DS28E18SsHigh : DS28E18SsLow};
   uint8_t result[1];
   uint8_t result_len = 1;
   return write_cmd(cmd, 1, result, &result_len);
@@ -414,8 +414,6 @@ void DS28E18::setOneWire(OneWire* oneWire) {
 // initialise the bus
 bool DS28E18::begin(void) {
   begin(0xa5, 0x0f);
-}
-
 }
 
 bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {  
