@@ -75,8 +75,8 @@ uint16_t DS28E18Device::getStatus() {
   return result[1];
 }
 
-bool DS28E18Device::setSpiSs(uint8_t value) {
-  uint8_t cmd[] = {(uint8_t) value ? DS28E18SsHigh : DS28E18SsLow};
+bool setSpiSs(uint8_t value) {
+  uint8_t cmd[] = {(uint8_t)(value ? DS28E18SsHigh : DS28E18SsLow)};
   uint8_t result[1];
   uint8_t result_len = 1;
   return write_cmd(cmd, 1, result, &result_len);
@@ -413,7 +413,7 @@ void DS28E18::setOneWire(OneWire* oneWire) {
 
 // initialise the bus
 bool DS28E18::begin(void) {
-  begin(0xa5, 0x0f);
+  return begin(0xa5, 0x0f);
 }
 
 bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {  
@@ -457,7 +457,7 @@ uint8_t DS28E18::getDeviceCount(void) {
   return _devices.size();
 }
 
-uint8_t DS28E18::getStatus(DeviceAddress deviceAddress) {
+uint8_t getStatus(DeviceAddress deviceAddress) {
   for(auto it : _devices) {
     if(it->hasAddress(deviceAddress)) {
       return it->getStatus();
@@ -466,7 +466,7 @@ uint8_t DS28E18::getStatus(DeviceAddress deviceAddress) {
   return 0xFF;
 }
 
-uint8_t DS28E18::getStatus(uint8_t index) {
+uint8_t getStatus(uint8_t index) {
   IDXCHECK
     return _devices.at(index)->getStatus();
 }
