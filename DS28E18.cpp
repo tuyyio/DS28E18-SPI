@@ -75,7 +75,7 @@ uint16_t DS28E18Device::getStatus() {
   return result[1];
 }
 
-bool setSpiSs(uint8_t value) {
+bool DS28E18Device::setSpiSs(uint8_t value) {
   uint8_t cmd[] = {(uint8_t)(value ? DS28E18SsHigh : DS28E18SsLow)};
   uint8_t result[1];
   uint8_t result_len = 1;
@@ -416,9 +416,14 @@ bool DS28E18::begin(void) {
   return begin(0xa5, 0x0f);
 }
 
-bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {  
+bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {
   DeviceAddress deviceAddress;
 
+  // Self-populating the unique ROM ID must be done before a one-wire search.
+  powerUpRomId();
+  
+  // Normal one-wire search.
+  _wire->reset();
   _wire->reset_search();
   _devices.clear(); // Reset the number of devices when we enumerate wire devices
   bool init_need = false;
@@ -452,12 +457,25 @@ bool DS28E18::begin(uint8_t ctlRegHi,uint8_t ctlRegLo) {
   return true;
 }
 
+// Causes all of the DS28E18 on the one-wire bus to self-set their unique ROM ID.
+// See DS28E18 spec p. 13 in the section called "Power-Up ROM ID Serialization".
+void DS28E18::powerUpRomId() {
+  uint8_t powerUpCmd[] = {DS28E18CommandCode,5,DS28E18WriteGPIOConfiguration,0xb,0x3,0xa5,0xf};
+  _wire->reset();
+  _wire->skip();
+  _wire->write_bytes(powerUpCmd, sizeof(powerUpCmd));
+  uint8_t b[4];
+  _wire->read_bytes(b, 2);  // ignores the result
+  _wire->write(0xAA);
+  _wire->read_bytes(b, 4);  // ignores the result
+}
+
 // returns the number of devices found on the bus
 uint8_t DS28E18::getDeviceCount(void) {
   return _devices.size();
 }
 
-uint8_t getStatus(DeviceAddress deviceAddress) {
+uint8_t DS28E18::getStatus(DeviceAddress deviceAddress) {
   for(auto it : _devices) {
     if(it->hasAddress(deviceAddress)) {
       return it->getStatus();
@@ -466,22 +484,22 @@ uint8_t getStatus(DeviceAddress deviceAddress) {
   return 0xFF;
 }
 
-uint8_t getStatus(uint8_t index) {
+uint8_t DS28E18::getStatus(uint8_t index) {
   IDXCHECK
     return _devices.at(index)->getStatus();
 }
 
 // sets SPI SS pin high or low.
-bool setSpiSs(DeviceAddress addr, uint8_t value) {
+bool DS28E18::setSpiSs(DeviceAddress addr, uint8_t value) {
   for(auto it : _devices) {
     if(it->hasAddress(deviceAddress)) {
       return it->setSpiSs(value);
     }
   }
-  return 0xFF;
+  return false;
 }
 
-bool setSpiSs(uint8_t index, uint8_t value) {
+bool DS28E18::setSpiSs(uint8_t index, uint8_t value) {
   IDXCHECK
     return _devices.at(index)->setSpiSs(value);
 }

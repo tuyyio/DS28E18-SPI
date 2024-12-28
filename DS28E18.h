@@ -91,6 +91,9 @@ public:
   bool begin();
   bool begin(uint8_t, uint8_t);
 
+  // one time power up
+  void DS28E18::powerUpRomId();
+  
   // returns the count of DS28E28 found on the bus
   uint8_t getDeviceCount(void);
 
